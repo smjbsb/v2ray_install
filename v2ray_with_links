@@ -30,7 +30,7 @@ EOF
 )
     vmess_base64=$(base64_encode "$vmess_json")
     vmess_link="vmess://$vmess_base64"
-    echo "VMess 链接: $vmess_link"
+    echo "$vmess_link"
 }
 
 # 生成Shadowsocks配置链接
@@ -45,7 +45,7 @@ generate_ss_link() {
 
     # 构建Shadowsocks链接
     ss_link="ss://$ss_base64@$server_ip:$ss_port#V2Ray_ShadowSocks"
-    echo "Shadowsocks 链接: $ss_link"
+    echo "$ss_link"
 }
 
 # 主流程控制
