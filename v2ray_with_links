@@ -12,23 +12,43 @@ base64_encode() {
 
 # 生成VMess配置链接
 generate_vmess_link() {
+    # 获取服务器的外网 IP
+    local server_ip
+    server_ip=$(curl -s ifconfig.me)
+
+    # 从配置文件中获取相关参数
+    local uuid
+    uuid=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[0].id' /usr/local/etc/v2ray/config.json)
+
+    local port
+    port=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .port' /usr/local/etc/v2ray/config.json)
+
+    local path
+    path=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .streamSettings.wsSettings.path' /usr/local/etc/v2ray/config.json)
+
+    # 构建 VMess JSON
+    local vmess_json
     vmess_json=$(cat <<EOF
 {
   "v": "2",
   "ps": "V2Ray Server",
   "add": "$server_ip",
-  "port": "443",
-  "id": "$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[0].id' /usr/local/etc/v2ray/config.json)",
+  "port": "$port",
+  "id": "$uuid",
   "aid": "0",
   "net": "ws",
   "type": "none",
   "host": "",
-  "path": "/ws",
+  "path": "$path",
   "tls": "none"
 }
 EOF
 )
+
+    # Base64 编码并输出 VMess 链接
+    local vmess_base64
     vmess_base64=$(base64_encode "$vmess_json")
+    local vmess_link
     vmess_link="vmess://$vmess_base64"
     echo "$vmess_link"
 }
