@@ -44,7 +44,7 @@ generate_ss_link() {
     ss_base64=$(echo -n "$ss_method:$ss_password" | base64 -w 0)
 
     # 构建Shadowsocks链接
-    ss_link="ss://$ss_base64@$server_ip:$ss_port#V2Ray_ShadowSocks"
+    ss_link="ss://$ss_base64@$server_ip:$ss_port#ShadowSocks"
     echo "$ss_link"
 }
 
