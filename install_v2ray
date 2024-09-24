@@ -154,7 +154,7 @@ generate_ss_password
 get_server_ip
 generate_vmess_ss_config
 restart_v2ray
-generate_vmess_link # 输出VMess配置链接
-generate_ss_link    # 输出Shadowsocks配置链接
+# generate_vmess_link # 输出VMess配置链接
+# generate_ss_link    # 输出Shadowsocks配置链接
 
 echo "----------------------------------------"
