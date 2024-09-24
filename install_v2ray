@@ -1,0 +1,160 @@
+#!/bin/bash
+
+# 检查是否以root用户运行
+if [ "$(id -u)" -ne 0 ]; then
+    echo "请以root用户运行此脚本"
+    exit 1
+fi
+
+# 更新软件包列表并安装必备软件
+apt update && apt install -y curl wget unzip socat jq
+
+# 安装 V2Ray 内核
+install_v2ray() {
+    echo "正在安装 V2Ray..."
+    bash <(curl -L https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh)
+    systemctl enable v2ray
+}
+
+# 生成随机 UUID
+generate_uuid() {
+    uuid=$(cat /proc/sys/kernel/random/uuid)
+    echo "生成的 UUID: $uuid"
+}
+
+# 生成随机 Shadowsocks 密码
+generate_ss_password() {
+    ss_password=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16)
+    echo "生成的 Shadowsocks 密码: $ss_password"
+}
+
+# 获取服务器外网 IP
+get_server_ip() {
+    server_ip=$(curl -s ifconfig.me)
+    echo "服务器外网 IP: $server_ip"
+}
+
+# 配置 VMess + WS + Shadowsocks
+generate_vmess_ss_config() {
+    cat > /usr/local/etc/v2ray/config.json <<EOF
+{
+  "inbounds": [
+    {
+      "port": 11443,
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          {
+            "id": "$uuid",
+            "alterId": 0,
+            "level": 0
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/ws"
+        }
+      }
+    },
+    {
+      "port": 12443,
+      "protocol": "shadowsocks",
+      "settings": {
+        "method": "aes-256-gcm",
+        "password": "$ss_password",
+        "network": "tcp,udp"
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "settings": {}
+    },
+    {
+      "protocol": "blackhole",
+      "settings": {},
+      "tag": "blocked"
+    }
+  ],
+  "routing": {
+    "rules": [
+      {
+        "type": "field",
+        "ip": [
+          "geoip:private"
+        ],
+        "outboundTag": "blocked"
+      }
+    ]
+  }
+}
+EOF
+}
+
+# 重新启动 V2Ray
+restart_v2ray() {
+    echo "正在重新启动 V2Ray 服务..."
+    systemctl restart v2ray
+    echo "V2Ray 已启动"
+}
+
+# Base64编码函数
+base64_encode() {
+    echo -n "$1" | base64 -w 0
+}
+
+# 生成VMess配置链接
+generate_vmess_link() {
+    vmess_json=$(cat <<EOF
+{
+  "v": "2",
+  "ps": "V2Ray Server",
+  "add": "$server_ip",
+  "port": "443",
+  "id": "$uuid",
+  "aid": "0",
+  "net": "ws",
+  "type": "none",
+  "host": "",
+  "path": "/ws",
+  "tls": "none"
+}
+EOF
+)
+    vmess_base64=$(base64_encode "$vmess_json")
+    vmess_link="vmess://$vmess_base64"
+    echo "VMess 链接: $vmess_link"
+}
+
+# 生成Shadowsocks配置链接
+generate_ss_link() {
+    # 提取Shadowsocks相关配置
+    ss_port=$(jq -r '.inbounds[] | select(.protocol=="shadowsocks") | .port' /usr/local/etc/v2ray/config.json)
+    ss_password=$(jq -r '.inbounds[] | select(.protocol=="shadowsocks") | .settings.password' /usr/local/etc/v2ray/config.json)
+    ss_method=$(jq -r '.inbounds[] | select(.protocol=="shadowsocks") | .settings.method' /usr/local/etc/v2ray/config.json)
+
+    # Base64编码"加密方式:密码"
+    ss_base64=$(echo -n "$ss_method:$ss_password" | base64 -w 0)
+
+    # 构建Shadowsocks链接
+    ss_link="ss://$ss_base64@$server_ip:$ss_port#V2Ray_ShadowSocks"
+    echo "Shadowsocks 链接: $ss_link"
+}
+
+# 主流程
+echo "V2Ray 自动安装脚本"
+
+# 执行安装、配置、生成密码和 UUID 等步骤
+install_v2ray
+generate_uuid
+generate_ss_password
+get_server_ip
+generate_vmess_ss_config
+restart_v2ray
+generate_vmess_link # 输出VMess配置链接
+generate_ss_link    # 输出Shadowsocks配置链接
+
+echo "----------------------------------------"
